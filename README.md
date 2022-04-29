@@ -73,10 +73,17 @@ My ```.vscode/settings.json``` configuration for liveServer is:
 
 Repalce the items in << >> with the details you created using ```mkcert```.
 
+## Publish to Github Pages
+
+The repo uses the npm package 'gh-pages' to deploy the site.  Use the following command to deploy.
+
+```bash
+npm run deploy
+```
+
 
 ## TODO
 
 - [x] Publish to github pages 
-- [ ] Add github actions to publish the github pages
 - [ ] Add full decode to hidDecode.ts
 - [ ] Improve visual presentation
