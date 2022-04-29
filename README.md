@@ -4,6 +4,8 @@ This project aims to be a zero-install version of the great tool [hidviz](https:
 
 I just need to find the time to finish this off!
 
+Visit [WebHIDViz](https://m5p3nc3r.github.io/webhidviz/) to see an example usage.
+
 ## How its implemented
 
 I wanted to make use of modern web techniques for this project, so it is making use of
@@ -74,6 +76,7 @@ Repalce the items in << >> with the details you created using ```mkcert```.
 
 ## TODO
 
-- [ ] Publish to github pages 
+- [x] Publish to github pages 
+- [ ] Add github actions to publish the github pages
 - [ ] Add full decode to hidDecode.ts
 - [ ] Improve visual presentation
