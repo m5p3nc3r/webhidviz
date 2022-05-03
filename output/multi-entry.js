@@ -22,6 +22,295 @@ HIDSelector.select = async () => {
 };
 (_a = document.getElementById('request-hid-device')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', HIDSelector.select);
 
+/**
+ * This code is modified from https://github.com/nebkat/bit-buffer-ts/
+ *
+ * I only need a stream reader for now, so have removed the writing bits
+ * Stream writing will be added if we add report generation
+ */
+class BitView {
+    constructor(buffer, byteOffset = 0, byteLength = buffer.length - byteOffset) {
+        this.getBoolean = (offset) => this.getBit(offset) === 1;
+        this.getInt8 = (offset) => this.getBits(offset, 8, true);
+        this.getUint8 = (offset) => this.getBits(offset, 8, false);
+        this.getInt16 = (offset) => this.getBits(offset, 16, true);
+        this.getUint16 = (offset) => this.getBits(offset, 16, false);
+        this.getInt32 = (offset) => this.getBits(offset, 32, true);
+        this.getUint32 = (offset) => this.getBits(offset, 32, false);
+        this.buffer = (byteOffset === 0 && byteLength === buffer.length)
+            ? buffer : buffer.subarray(byteOffset, byteOffset + byteLength);
+        this.byteLength = byteLength;
+        this.bitLength = byteLength * 8;
+    }
+    checkBounds(offset, bits) {
+        const available = (this.bitLength - offset);
+        if (bits > available)
+            throw new Error('Cannot get/set ' + bits + ' bit(s) from offset ' + offset + ', ' + available + ' available');
+    }
+    /**
+     * Returns the bit value at the specified bit offset.
+     *
+     * @param offset Offset of bit.
+     */
+    getBit(offset) {
+        return (this.buffer[offset >> 3] >> ((offset & 0b111)) & 0b1);
+        //        return (this.buffer[offset >> 3] >> (7 - (offset & 0b111)) & 0b1) as (1 | 0);
+    }
+    /**
+     * Returns a `bits` long value at the specified bit offset.
+     *
+     * @param offset Offset of bits.
+     * @param bits Number of bits to read.
+     * @param signed Whether the result should be a signed or unsigned value.
+     */
+    getBits(offset, bits, signed) {
+        this.checkBounds(offset, bits);
+        let value = 0;
+        let written = 0;
+        for (let index = 0; index < bits; index++) {
+            let bit = this.getBit(offset + index);
+            value += bit << written;
+            written++;
+        }
+        if (signed) {
+            // Read imaginary MSB and convert to signed if needed
+            if (bits < 32 && value >> (bits - 1) > 0) {
+                value |= -1 ^ ((1 << bits) - 1);
+            }
+            else if (bits > 32 && value > 2 ** (bits - 1)) {
+                value -= 2 ** bits;
+            }
+        }
+        return value;
+    }
+    /**
+     * Returns a buffer containing the bytes at the specified bit offset.
+     *
+     * @param offset Offset of bytes.
+     * @param byteLength Number of bytes to read.
+     */
+    readBuffer(offset, byteLength) {
+        const buffer = new Uint8Array(byteLength);
+        for (let i = 0; i < byteLength; i++)
+            buffer[i] = this.getUint8(offset + (i * 8));
+        return buffer;
+    }
+}
+/**
+ * Wrapper for {@link BitView}s that maintains an index while reading/writing sequential data.
+ */
+class BitInputStream {
+    constructor(source, byteOffset, byteLength) {
+        this.readBoolean = () => this.readBit() === 1;
+        this.readInt8 = () => this.read(8, true);
+        this.readUint8 = () => this.read(8, false);
+        this.readInt16 = () => this.read(16, true);
+        this.readUint16 = () => this.read(16, false);
+        this.readInt32 = () => this.read(32, true);
+        this.readUint32 = () => this.read(32, false);
+        this.view = source instanceof BitView ? source : new BitView(source, byteOffset, byteLength);
+        this.buffer = this.view.buffer;
+        this.bitIndex = 0;
+        this.bitLength = this.view.bitLength;
+        this.byteLength = this.view.byteLength;
+    }
+    /** Alias for {@link bitIndex} */
+    get index() { return this.bitIndex; }
+    set index(val) { this.bitIndex = val; }
+    ;
+    /** Number of bits remaining in this stream's underlying buffer from the current position. */
+    get bitsLeft() { return this.bitLength - this.bitIndex; }
+    /** Current position of this stream (in bytes) from/to which data is read/written. */
+    get byteIndex() { return Math.ceil(this.bitIndex / 8); }
+    set byteIndex(val) { this.bitIndex = val * 8; }
+    readBit() {
+        const val = this.view.getBit(this.bitIndex);
+        this.bitIndex++;
+        return val;
+    }
+    read(bits, signed = false) {
+        const val = this.view.getBits(this.bitIndex, bits, signed);
+        this.bitIndex += bits;
+        return val;
+    }
+    readBuffer(byteLength) {
+        const buffer = this.view.readBuffer(this.bitIndex, byteLength);
+        this.bitIndex += byteLength * 8;
+        return buffer;
+    }
+}
+
+class HIDDecode {
+    static fromPacked(packed) {
+        let page = (packed >> 16) & 0xffff;
+        let id = packed & 0xffff;
+        return [this.usagePage(page), this.usage(page, id)];
+    }
+    static usagePage(usagePage) {
+        let ret = "";
+        switch (usagePage ? usagePage : 0) {
+            case 0x00:
+                ret = "undefined";
+                break;
+            case 0x01:
+                ret = "Generic Desktop Controls";
+                break;
+            case 0x02:
+                ret = "Simulation Controls";
+                break;
+            case 0x03:
+                ret = "VR Controls";
+                break;
+            case 0x04:
+                ret = "Sport Controls";
+                break;
+            case 0x05:
+                ret = "Game Controls";
+                break;
+            case 0x06:
+                ret = "Generic Device Controls";
+                break;
+            case 0x07:
+                ret = "Keyboard/Keypad";
+                break;
+            case 0x08:
+                ret = "LEDs";
+                break;
+            case 0x09:
+                ret = "Button";
+                break;
+            case 0x0a:
+                ret = "Ordinal";
+                break;
+            case 0x0b:
+                ret = "Telophony";
+                break;
+            case 0x0c:
+                ret = "Consumer";
+                break;
+            case 0x0d:
+                ret = "Digitizer";
+                break;
+            case 0x0e:
+                ret = "Reserved";
+                break;
+            case 0x0f:
+                ret = "PID Page";
+                break;
+            case 0x10:
+                ret = "Unicode";
+                break;
+            default: {
+                if (usagePage ? usagePage : 0 >= 0xff00)
+                    ret = "Vendor-defined";
+                else
+                    ret = "Reserved or not decoded...";
+                break;
+            }
+        }
+        return ret;
+    }
+    static usage(usagePage, usage) {
+        let ret = "";
+        switch (usagePage ? usagePage : 0) {
+            case 0x00:
+                ret = "Undefined";
+                break;
+            case 0x01:
+                ret = this.usage_genericDesktop(usage);
+                break;
+            default:
+                ret = "DEFAULT";
+                break;
+        }
+        return ret;
+    }
+    // https://www.usb.org/sites/default/files/documents/hut1_12v2.pdf page 26
+    static usage_genericDesktop(usage) {
+        let ret = "";
+        switch (usage ? usage : 0) {
+            case 0x00:
+                ret = "Undefined";
+                break;
+            case 0x01:
+                ret = "Pointer";
+                break;
+            case 0x02:
+                ret = "Mouse";
+                break;
+            case 0x04:
+                ret = "Joystick";
+                break;
+            case 0x05:
+                ret = "Game Pad";
+                break;
+            case 0x06:
+                ret = "Keyboard";
+                break;
+            case 0x07:
+                ret = "Keypad";
+                break;
+            case 0x08:
+                ret = "Multi-axis Controller";
+                break;
+            case 0x09:
+                ret = "Tablet PC System Controls";
+                break;
+            // 0x10 - 0x2F Reserved
+            case 0x30:
+                ret = "X";
+                break;
+            case 0x31:
+                ret = "Y";
+                break;
+            case 0x32:
+                ret = "Z";
+                break;
+            case 0x33:
+                ret = "Rx";
+                break;
+            case 0x34:
+                ret = "Ry";
+                break;
+            case 0x35:
+                ret = "Rz";
+                break;
+            case 0x36:
+                ret = "Slider";
+                break;
+            case 0x37:
+                ret = "Dial";
+                break;
+            case 0x38:
+                ret = "Wheel";
+                break;
+            case 0x39:
+                ret = "Hat switch";
+                break;
+            case 0x3A:
+                ret = "Counted Buffer";
+                break;
+            case 0x3B:
+                ret = "Byte Count";
+                break;
+            case 0x3C:
+                ret = "Motion Wakeup";
+                break;
+            case 0x3D:
+                ret = "Start";
+                break;
+            case 0x3E:
+                ret = "Select";
+                break;
+            // 0x3F Reserved
+            default:
+                ret = "Unparsed (TODO)";
+                break;
+        }
+        return ret;
+    }
+}
+
 /*! *****************************************************************************
 Copyright (c) Microsoft Corporation.
 
@@ -904,177 +1193,6 @@ function e(e) {
 var n;
 null != (null === (n = window.HTMLSlotElement) || void 0 === n ? void 0 : n.prototype.assignedElements) ? (o, n) => o.assignedElements(n) : (o, n) => o.assignedNodes(n).filter(o => o.nodeType === Node.ELEMENT_NODE);
 
-class HIDDecode {
-    static fromPacked(packed) {
-        let page = (packed >> 16) & 0xffff;
-        let id = packed & 0xffff;
-        return [this.usagePage(page), this.usage(page, id)];
-    }
-    static usagePage(usagePage) {
-        let ret = "";
-        switch (usagePage ? usagePage : 0) {
-            case 0x00:
-                ret = "undefined";
-                break;
-            case 0x01:
-                ret = "Generic Desktop Controls";
-                break;
-            case 0x02:
-                ret = "Simulation Controls";
-                break;
-            case 0x03:
-                ret = "VR Controls";
-                break;
-            case 0x04:
-                ret = "Sport Controls";
-                break;
-            case 0x05:
-                ret = "Game Controls";
-                break;
-            case 0x06:
-                ret = "Generic Device Controls";
-                break;
-            case 0x07:
-                ret = "Keyboard/Keypad";
-                break;
-            case 0x08:
-                ret = "LEDs";
-                break;
-            case 0x09:
-                ret = "Button";
-                break;
-            case 0x0a:
-                ret = "Ordinal";
-                break;
-            case 0x0b:
-                ret = "Telophony";
-                break;
-            case 0x0c:
-                ret = "Consumer";
-                break;
-            case 0x0d:
-                ret = "Digitizer";
-                break;
-            case 0x0e:
-                ret = "Reserved";
-                break;
-            case 0x0f:
-                ret = "PID Page";
-                break;
-            case 0x10:
-                ret = "Unicode";
-                break;
-            default: {
-                if (usagePage ? usagePage : 0 >= 0xff00)
-                    ret = "Vendor-defined";
-                else
-                    ret = "Reserved or not decoded...";
-                break;
-            }
-        }
-        return ret;
-    }
-    static usage(usagePage, usage) {
-        let ret = "";
-        switch (usagePage ? usagePage : 0) {
-            case 0x00:
-                ret = "Undefined";
-                break;
-            case 0x01:
-                ret = this.usage_genericDesktop(usage);
-                break;
-            default:
-                ret = "DEFAULT";
-                break;
-        }
-        return ret;
-    }
-    // https://www.usb.org/sites/default/files/documents/hut1_12v2.pdf page 26
-    static usage_genericDesktop(usage) {
-        let ret = "";
-        switch (usage ? usage : 0) {
-            case 0x00:
-                ret = "Undefined";
-                break;
-            case 0x01:
-                ret = "Pointer";
-                break;
-            case 0x02:
-                ret = "Mouse";
-                break;
-            case 0x04:
-                ret = "Joystick";
-                break;
-            case 0x05:
-                ret = "Game Pad";
-                break;
-            case 0x06:
-                ret = "Keyboard";
-                break;
-            case 0x07:
-                ret = "Keypad";
-                break;
-            case 0x08:
-                ret = "Multi-axis Controller";
-                break;
-            case 0x09:
-                ret = "Tablet PC System Controls";
-                break;
-            // 0x10 - 0x2F Reserved
-            case 0x30:
-                ret = "X";
-                break;
-            case 0x31:
-                ret = "Y";
-                break;
-            case 0x32:
-                ret = "Z";
-                break;
-            case 0x33:
-                ret = "Rx";
-                break;
-            case 0x34:
-                ret = "Ry";
-                break;
-            case 0x35:
-                ret = "Rz";
-                break;
-            case 0x36:
-                ret = "Slider";
-                break;
-            case 0x37:
-                ret = "Dial";
-                break;
-            case 0x38:
-                ret = "Wheel";
-                break;
-            case 0x39:
-                ret = "Hat switch";
-                break;
-            case 0x3A:
-                ret = "Counted Buffer";
-                break;
-            case 0x3B:
-                ret = "Byte Count";
-                break;
-            case 0x3C:
-                ret = "Motion Wakeup";
-                break;
-            case 0x3D:
-                ret = "Start";
-                break;
-            case 0x3E:
-                ret = "Select";
-                break;
-            // 0x3F Reserved
-            default:
-                ret = "Unparsed (TODO)";
-                break;
-        }
-        return ret;
-    }
-}
-
 class HIDLitElement extends s {
     constructor() {
         super();
@@ -1090,8 +1208,8 @@ let HIDUsageView = class HIDUsageView extends s {
         // betwee lMin and lMax
         this.slider = 0;
         this.usage = usage ? HIDDecode.fromPacked(usage)[1] : undefined;
-        this.lMin = lMin;
-        this.lMax = lMax;
+        this.lMin = lMin || 0;
+        this.lMax = lMax || 0;
     }
     get value() {
         return this._value;
@@ -1120,6 +1238,17 @@ let HIDUsageView = class HIDUsageView extends s {
         `;
     }
 };
+HIDUsageView.styles = r$2 `
+    :host {
+        padding: 10px;
+    }
+    `;
+__decorate([
+    e({ type: Number })
+], HIDUsageView.prototype, "lMin", void 0);
+__decorate([
+    e({ type: Number })
+], HIDUsageView.prototype, "lMax", void 0);
 __decorate([
     e({ type: Number })
 ], HIDUsageView.prototype, "value", null);
@@ -1135,23 +1264,40 @@ var HIDReportType;
     HIDReportType[HIDReportType["Input"] = 0] = "Input";
     HIDReportType[HIDReportType["Output"] = 1] = "Output";
     HIDReportType[HIDReportType["Feature"] = 2] = "Feature";
+    HIDReportType[HIDReportType["Undefined"] = 3] = "Undefined";
 })(HIDReportType || (HIDReportType = {}));
 let HIDReportItemView = class HIDReportItemView extends HIDLitElement {
-    constructor(ctx, type) {
+    constructor(ctx) {
         super();
-        this.type = type;
-        if (ctx.reportCount) {
+        this.type = HIDReportType.Undefined;
+        if (ctx === null || ctx === void 0 ? void 0 : ctx.reportCount) {
             for (let i = 0; i < ctx.reportCount; i++) {
                 if (ctx.logicalMinimum != undefined && ctx.logicalMaximum != undefined) {
                     let usage = ctx.usages ? ctx.usages[i] : undefined;
                     let usageView = new HIDUsageView(ctx.logicalMinimum, ctx.logicalMaximum, usage);
-                    usageView.setAttribute('slot', 'usage');
                     this.appendChild(usageView);
                 }
             }
         }
-        this.reportSize = ctx.reportSize ? ctx.reportSize : 0;
-        this.reportCount = ctx.reportCount ? ctx.reportCount : 0;
+        this.reportSize = (ctx === null || ctx === void 0 ? void 0 : ctx.reportSize) || 0;
+        this.reportCount = (ctx === null || ctx === void 0 ? void 0 : ctx.reportCount) || 0;
+    }
+    firstUpdated() {
+        var _a;
+        switch ((_a = this.parentElement) === null || _a === void 0 ? void 0 : _a.slot) {
+            case "input":
+                this.type = HIDReportType.Input;
+                break;
+            case "output":
+                this.type = HIDReportType.Output;
+                break;
+            case "feature":
+                this.type = HIDReportType.Feature;
+                break;
+            default:
+                this.type = HIDReportType.Undefined;
+                break;
+        }
     }
     processStream(stream) {
         if (this.type == HIDReportType.Input) {
@@ -1165,7 +1311,9 @@ let HIDReportItemView = class HIDReportItemView extends HIDLitElement {
     render() {
         return $ `
         <p>HIDReportItemView
-        <slot name="usage"></slot>
+        <div class="container">
+          <slot></slot>
+        </div>
         `;
     }
 };
@@ -1174,7 +1322,7 @@ HIDReportItemView.styles = r$2 `
         display: block;
         padding: 10px;
     }
-    slot {
+    .container {
         display: flex;
         flex-direction: row;
         flex-wrap: wrap;
@@ -1185,15 +1333,12 @@ HIDReportItemView = __decorate([
 ], HIDReportItemView);
 
 let HIDReportInfoView = class HIDReportInfoView extends HIDLitElement {
-    constructor(ctx, type) {
+    constructor(ctx) {
         super();
-        this.ctx = ctx;
-        if (ctx.items) {
-            for (let item of ctx.items) {
-                let reportView = new HIDReportItemView(item, type);
-                reportView.setAttribute('slot', 'item');
-                this.appendChild(reportView);
-            }
+        this.reportId = (ctx === null || ctx === void 0 ? void 0 : ctx.reportId) || 0;
+        for (let item of (ctx === null || ctx === void 0 ? void 0 : ctx.items) || []) {
+            let reportView = new HIDReportItemView(item);
+            this.appendChild(reportView);
         }
     }
     processStream(stream) {
@@ -1204,13 +1349,15 @@ let HIDReportInfoView = class HIDReportInfoView extends HIDLitElement {
         });
     }
     render() {
-        var _a;
         return $ `
-        <p>Report ID ${(_a = this.ctx.reportId) === null || _a === void 0 ? void 0 : _a.toString()} 
-        <slot name='item'></slot>
+        <p>Report ID ${this.reportId.toString()} 
+        <slot></slot>
         `;
     }
 };
+__decorate([
+    e({ type: Number })
+], HIDReportInfoView.prototype, "reportId", void 0);
 HIDReportInfoView = __decorate([
     n$1('hid-reportinfo')
 ], HIDReportInfoView);
@@ -1218,15 +1365,20 @@ HIDReportInfoView = __decorate([
 let HIDCollectionInfoView = class HIDCollectionInfoView extends HIDLitElement {
     constructor(collection) {
         super();
-        this.collection = collection;
-        this.addReports("input", HIDReportType.Input, collection.inputReports);
-        this.addReports("output", HIDReportType.Output, collection.outputReports);
-        this.addReports("feature", HIDReportType.Feature, collection.featureReports);
+        // Extract required data from HIDCollectionInfo
+        this.type = (collection === null || collection === void 0 ? void 0 : collection.type) || 0;
+        this.usagePage = (collection === null || collection === void 0 ? void 0 : collection.usagePage) || 0;
+        this.usage = (collection === null || collection === void 0 ? void 0 : collection.usage) || 0;
+        if (collection) {
+            this.addReports("input", collection.inputReports);
+            this.addReports("output", collection.outputReports);
+            this.addReports("feature", collection.featureReports);
+        }
     }
-    addReports(slot, type, reports) {
+    addReports(slot, reports) {
         if (reports) {
             for (let report of reports) {
-                let reportView = new HIDReportInfoView(report, type);
+                let reportView = new HIDReportInfoView(report);
                 reportView.setAttribute('slot', slot);
                 this.appendChild(reportView);
             }
@@ -1240,147 +1392,44 @@ let HIDCollectionInfoView = class HIDCollectionInfoView extends HIDLitElement {
         });
     }
     render() {
-        var _a;
         return $ `
-        <p>Type : ${(_a = this.collection.type) === null || _a === void 0 ? void 0 : _a.toString()},
-        Usage Page : ${HIDDecode.usagePage(this.collection.usagePage)},
-        Usage : ${HIDDecode.usage(this.collection.usagePage, this.collection.usage)}
+        <p>Type : ${this.type.toString()},
+        Usage Page : ${HIDDecode.usagePage(this.usagePage)},
+        Usage : ${HIDDecode.usage(this.usagePage, this.usage)}
         <slot name='input'></slot>
         <slot name='output'></slot>
         <slot name='feature'></slot>
         `;
     }
 };
+__decorate([
+    e({ type: Number })
+], HIDCollectionInfoView.prototype, "type", void 0);
+__decorate([
+    e({ type: Number })
+], HIDCollectionInfoView.prototype, "usagePage", void 0);
+__decorate([
+    e({ type: Number })
+], HIDCollectionInfoView.prototype, "usage", void 0);
 HIDCollectionInfoView = __decorate([
     n$1('hid-collectioninfo')
 ], HIDCollectionInfoView);
 
-/**
- * This code is modified from https://github.com/nebkat/bit-buffer-ts/
- *
- * I only need a stream reader for now, so have removed the writing bits
- * Stream writing will be added if we add report generation
- */
-class BitView {
-    constructor(buffer, byteOffset = 0, byteLength = buffer.length - byteOffset) {
-        this.getBoolean = (offset) => this.getBit(offset) === 1;
-        this.getInt8 = (offset) => this.getBits(offset, 8, true);
-        this.getUint8 = (offset) => this.getBits(offset, 8, false);
-        this.getInt16 = (offset) => this.getBits(offset, 16, true);
-        this.getUint16 = (offset) => this.getBits(offset, 16, false);
-        this.getInt32 = (offset) => this.getBits(offset, 32, true);
-        this.getUint32 = (offset) => this.getBits(offset, 32, false);
-        this.buffer = (byteOffset === 0 && byteLength === buffer.length)
-            ? buffer : buffer.subarray(byteOffset, byteOffset + byteLength);
-        this.byteLength = byteLength;
-        this.bitLength = byteLength * 8;
-    }
-    checkBounds(offset, bits) {
-        const available = (this.bitLength - offset);
-        if (bits > available)
-            throw new Error('Cannot get/set ' + bits + ' bit(s) from offset ' + offset + ', ' + available + ' available');
-    }
-    /**
-     * Returns the bit value at the specified bit offset.
-     *
-     * @param offset Offset of bit.
-     */
-    getBit(offset) {
-        return (this.buffer[offset >> 3] >> ((offset & 0b111)) & 0b1);
-        //        return (this.buffer[offset >> 3] >> (7 - (offset & 0b111)) & 0b1) as (1 | 0);
-    }
-    /**
-     * Returns a `bits` long value at the specified bit offset.
-     *
-     * @param offset Offset of bits.
-     * @param bits Number of bits to read.
-     * @param signed Whether the result should be a signed or unsigned value.
-     */
-    getBits(offset, bits, signed) {
-        this.checkBounds(offset, bits);
-        let value = 0;
-        let written = 0;
-        for (let index = 0; index < bits; index++) {
-            let bit = this.getBit(offset + index);
-            value += bit << written;
-            written++;
-        }
-        if (signed) {
-            // Read imaginary MSB and convert to signed if needed
-            if (bits < 32 && value >> (bits - 1) > 0) {
-                value |= -1 ^ ((1 << bits) - 1);
-            }
-            else if (bits > 32 && value > 2 ** (bits - 1)) {
-                value -= 2 ** bits;
-            }
-        }
-        return value;
-    }
-    /**
-     * Returns a buffer containing the bytes at the specified bit offset.
-     *
-     * @param offset Offset of bytes.
-     * @param byteLength Number of bytes to read.
-     */
-    readBuffer(offset, byteLength) {
-        const buffer = new Uint8Array(byteLength);
-        for (let i = 0; i < byteLength; i++)
-            buffer[i] = this.getUint8(offset + (i * 8));
-        return buffer;
-    }
-}
-/**
- * Wrapper for {@link BitView}s that maintains an index while reading/writing sequential data.
- */
-class BitInputStream {
-    constructor(source, byteOffset, byteLength) {
-        this.readBoolean = () => this.readBit() === 1;
-        this.readInt8 = () => this.read(8, true);
-        this.readUint8 = () => this.read(8, false);
-        this.readInt16 = () => this.read(16, true);
-        this.readUint16 = () => this.read(16, false);
-        this.readInt32 = () => this.read(32, true);
-        this.readUint32 = () => this.read(32, false);
-        this.view = source instanceof BitView ? source : new BitView(source, byteOffset, byteLength);
-        this.buffer = this.view.buffer;
-        this.bitIndex = 0;
-        this.bitLength = this.view.bitLength;
-        this.byteLength = this.view.byteLength;
-    }
-    /** Alias for {@link bitIndex} */
-    get index() { return this.bitIndex; }
-    set index(val) { this.bitIndex = val; }
-    ;
-    /** Number of bits remaining in this stream's underlying buffer from the current position. */
-    get bitsLeft() { return this.bitLength - this.bitIndex; }
-    /** Current position of this stream (in bytes) from/to which data is read/written. */
-    get byteIndex() { return Math.ceil(this.bitIndex / 8); }
-    set byteIndex(val) { this.bitIndex = val * 8; }
-    readBit() {
-        const val = this.view.getBit(this.bitIndex);
-        this.bitIndex++;
-        return val;
-    }
-    read(bits, signed = false) {
-        const val = this.view.getBits(this.bitIndex, bits, signed);
-        this.bitIndex += bits;
-        return val;
-    }
-    readBuffer(byteLength) {
-        const buffer = this.view.readBuffer(this.bitIndex, byteLength);
-        this.bitIndex += byteLength * 8;
-        return buffer;
-    }
-}
-
 let HIDDeviceView = class HIDDeviceView extends s {
     constructor(device) {
         super();
+        this.test = false;
+        this.vendorId = 0;
+        this.productId = 0;
+        this.productName = "";
         this.device = device;
     }
     // This function is called once after the first call to 'update'
     // This is the first time that the properties will be reflected properly
     firstUpdated() {
+        // No need to run this code if we are in test mode.
+        if (this.test)
+            return;
         if (this.device == undefined) {
             // If a device wasn't set in the constructor, try and find a matching device from our attributes
             navigator.hid.getDevices().then((devices) => {
@@ -1401,7 +1450,6 @@ let HIDDeviceView = class HIDDeviceView extends s {
             this.productName = device.productName;
             for (let collection of device.collections) {
                 let collectionView = new HIDCollectionInfoView(collection);
-                collectionView.setAttribute('slot', 'collection');
                 this.appendChild(collectionView);
             }
             device.open();
@@ -1420,16 +1468,19 @@ let HIDDeviceView = class HIDDeviceView extends s {
         });
     }
     render() {
-        var _a, _b, _c;
+        var _a, _b;
         return $ `
         <h1>Device</h1>
-        <p>Product Name : ${(_a = this.productName) === null || _a === void 0 ? void 0 : _a.toString()}
-        Product Id: ${(_b = this.productId) === null || _b === void 0 ? void 0 : _b.toString()}
-        Vendor Id : ${(_c = this.vendorId) === null || _c === void 0 ? void 0 : _c.toString()}
-        <slot name='collection'></slot>
+        <p>Product Name : ${this.productName}
+        Product Id: ${(_a = this.productId) === null || _a === void 0 ? void 0 : _a.toString()}
+        Vendor Id : ${(_b = this.vendorId) === null || _b === void 0 ? void 0 : _b.toString()}
+        <slot></slot>
         `;
     }
 };
+__decorate([
+    e({ type: Boolean })
+], HIDDeviceView.prototype, "test", void 0);
 __decorate([
     e({ type: Number })
 ], HIDDeviceView.prototype, "vendorId", void 0);
