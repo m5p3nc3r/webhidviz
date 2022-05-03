@@ -1,26 +1,23 @@
 import { html } from 'lit';
-import { customElement } from 'lit/decorators.js'
+import { customElement, property } from 'lit/decorators.js'
 import { HIDLitElement } from './hidlitelement';
 import { HIDReportItemView, HIDReportType } from './hidReportItemView';
 import { BitInputStream } from "../data/bitInputStream"
 
 @customElement('hid-reportinfo')
 export class HIDReportInfoView extends HIDLitElement {
-    ctx: HIDReportInfo;
+    @property({type: Number})
+    reportId: number;
 
-    constructor(ctx: HIDReportInfo, type: HIDReportType) {
+    constructor(ctx: HIDReportInfo) {
         super();
 
-        this.ctx = ctx;
+        this.reportId = ctx?.reportId||0;
         
-        if(ctx.items) {
-            for(let item of ctx.items) {
-                let reportView = new HIDReportItemView(item, type);
-                reportView.setAttribute('slot', 'item');
-                this.appendChild(reportView);
-            }
+        for(let item of ctx?.items||[]) {
+            let reportView = new HIDReportItemView(item);
+            this.appendChild(reportView);
         }
-
     }
 
     processStream(stream: BitInputStream) {
@@ -34,8 +31,8 @@ export class HIDReportInfoView extends HIDLitElement {
 
     render() {
         return html `
-        <p>Report ID ${this.ctx.reportId?.toString()} 
-        <slot name='item'></slot>
+        <p>Report ID ${this.reportId.toString()} 
+        <slot></slot>
         `;
     }
 }

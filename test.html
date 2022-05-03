@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <script type="module" src="output/multi-entry.js" defer></script>
+    <hid-device test>
+        <hid-collectioninfo product_name="Test Device" type="1" usagePage="1" usage="5">
+            <hid-reportinfo slot="input" reportId="1">
+                <hid-reportitem>
+                    <hid-usage lMin="0" lMax="100" value="50"></hid-usage>
+                    <hid-usage lMin="0" lMax="1" value="1"></hid-usage>
+                    <hid-usage lMin="-127" lMax="127" value="0"></hid-usage>
+                </hid-reportitem>
+            </hid-reportinfo>
+        </hid-collectioninfo>
+    </hid-device>
+</body>
+</html>

@@ -1,29 +1,41 @@
 import { html } from 'lit';
-import { customElement } from 'lit/decorators.js'
+import { customElement, property } from 'lit/decorators.js'
 import { HIDDecode } from '../data/hidDecode';
 import { HIDLitElement } from './hidlitelement';
 import { HIDReportInfoView } from './hidReportInfoView';
 import { BitInputStream } from "../data/bitInputStream"
-import { HIDReportType } from './hidReportItemView';
 
 @customElement('hid-collectioninfo')
 export class HIDCollectionInfoView extends HIDLitElement {
-    private collection: HIDCollectionInfo;
+    @property({type: Number})
+    type: number;
 
-    constructor(collection: HIDCollectionInfo) {
+    @property({type: Number})
+    usagePage: number;
+
+    @property({type: Number})
+    usage: number;
+
+
+    constructor(collection?: HIDCollectionInfo) {
         super();
 
-        this.collection = collection;
+        // Extract required data from HIDCollectionInfo
+        this.type = collection?.type||0;
+        this.usagePage = collection?.usagePage||0;
+        this.usage = collection?.usage||0;
 
-        this.addReports("input", HIDReportType.Input, collection.inputReports);
-        this.addReports("output", HIDReportType.Output, collection.outputReports);
-        this.addReports("feature", HIDReportType.Feature, collection.featureReports);
+        if(collection) {
+            this.addReports("input", collection.inputReports);
+            this.addReports("output", collection.outputReports);
+            this.addReports("feature", collection.featureReports);
+        }
     }
 
-    addReports(slot: string, type: HIDReportType, reports?: HIDReportInfo[]) {
+    addReports(slot: string, reports?: HIDReportInfo[]) {
         if(reports) {
             for(let report of reports) {
-                let reportView = new HIDReportInfoView(report, type);
+                let reportView = new HIDReportInfoView(report);
                 reportView.setAttribute('slot', slot);
                 this.appendChild(reportView);
             }
@@ -41,9 +53,9 @@ export class HIDCollectionInfoView extends HIDLitElement {
 
     render() {
         return html `
-        <p>Type : ${this.collection.type?.toString()},
-        Usage Page : ${HIDDecode.usagePage(this.collection.usagePage)},
-        Usage : ${HIDDecode.usage(this.collection.usagePage, this.collection.usage)}
+        <p>Type : ${this.type.toString()},
+        Usage Page : ${HIDDecode.usagePage(this.usagePage)},
+        Usage : ${HIDDecode.usage(this.usagePage, this.usage)}
         <slot name='input'></slot>
         <slot name='output'></slot>
         <slot name='feature'></slot>

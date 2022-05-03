@@ -17,7 +17,7 @@
   "scripts": {
     "build": "rollup --config rollup.config.js",
     "watch": "rollup --config rollup.config.js -w",
-    "predeploy": "rollup --config rollup.config.js && mkdir build && cp -a output build && cp index.html build",
+    "predeploy": "rollup --config rollup.config.js && mkdir build && cp -a output index.html test.html build",
     "deploy": "gh-pages -d build"
   }
 }

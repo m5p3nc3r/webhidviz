@@ -7,33 +7,41 @@ import { BitInputStream } from "../data/bitInputStream"
 export enum HIDReportType {
     Input,
     Output,
-    Feature
+    Feature,
+    Undefined
 }
 
 @customElement('hid-reportitem')
 export class HIDReportItemView extends HIDLitElement {
     private reportSize: number;
     private reportCount: number;
-    private type: HIDReportType;
+    private type: HIDReportType = HIDReportType.Undefined;
 
-    constructor(ctx: HIDReportItem, type: HIDReportType) {
+    constructor(ctx?: HIDReportItem) {
         super();
 
-        this.type = type;
 
-        if(ctx.reportCount) {
+        if(ctx?.reportCount) {
             for(let i=0; i<ctx.reportCount; i++) {
                 if(ctx.logicalMinimum!=undefined && ctx.logicalMaximum!=undefined) {
                     let usage = ctx.usages ? ctx.usages[i] : undefined;
                     let usageView = new HIDUsageView(ctx.logicalMinimum, ctx.logicalMaximum, usage);
-                    usageView.setAttribute('slot', 'usage');
                     this.appendChild(usageView);
                 }
             }
         }
 
-        this.reportSize = ctx.reportSize?ctx.reportSize:0;
-        this.reportCount = ctx.reportCount?ctx.reportCount:0;
+        this.reportSize = ctx?.reportSize||0;
+        this.reportCount = ctx?.reportCount||0;
+    }
+
+    firstUpdated() {
+        switch(this.parentElement?.slot) {
+            case "input": this.type=HIDReportType.Input; break;
+            case "output": this.type=HIDReportType.Output; break;
+            case "feature": this.type=HIDReportType.Feature; break
+            default: this.type=HIDReportType.Undefined; break;
+        }
     }
 
     processStream(stream: BitInputStream) {
@@ -51,7 +59,7 @@ export class HIDReportItemView extends HIDLitElement {
         display: block;
         padding: 10px;
     }
-    slot {
+    .container {
         display: flex;
         flex-direction: row;
         flex-wrap: wrap;
@@ -59,9 +67,11 @@ export class HIDReportItemView extends HIDLitElement {
     `;
 
     render() {
-        return html `
+        return html`
         <p>HIDReportItemView
-        <slot name="usage"></slot>
+        <div class="container">
+          <slot></slot>
+        </div>
         `;
     }
 }

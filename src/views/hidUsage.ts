@@ -1,11 +1,14 @@
-import { html, LitElement } from 'lit';
+import { html, css, LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js'
 import { HIDDecode } from '../data/hidDecode';
 
 @customElement('hid-usage')
 export class HIDUsageView extends LitElement {
     usage?: string;
+
+    @property({type: Number})
     lMin: number;
+    @property({type: Number})
     lMax: number;
 
     // This is the raw value from the input stream
@@ -29,11 +32,11 @@ export class HIDUsageView extends LitElement {
     @property({type: Number})
     slider: number = 0;
 
-    constructor(lMin: number, lMax: number, usage?: number) {
+    constructor(lMin?: number, lMax?: number, usage?: number) {
         super();
         this.usage = usage?HIDDecode.fromPacked(usage)[1]:undefined;
-        this.lMin = lMin;
-        this.lMax = lMax;
+        this.lMin = lMin || 0;
+        this.lMax = lMax || 0;
     }
 
     normaliseValue(val: number) : number {
@@ -43,6 +46,13 @@ export class HIDUsageView extends LitElement {
         let value = val - this.lMin;
         return (value / range);
     }
+
+    static styles = css`
+    :host {
+        padding: 10px;
+    }
+    `;
+
 
     render() {
         return html `

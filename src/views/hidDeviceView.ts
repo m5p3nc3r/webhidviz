@@ -7,14 +7,17 @@ import { BitInputStream } from "../data/bitInputStream"
 @customElement('hid-device')
 export class HIDDeviceView extends LitElement {
 
-    @property({type: Number})
-    vendorId?: number;
+    @property({type: Boolean})
+    test: boolean = false;
 
     @property({type: Number})
-    productId?: number;
+    vendorId: number = 0;
+
+    @property({type: Number})
+    productId: number = 0;
 
     @property({type: String})
-    productName?: string;
+    productName: string = "";
 
     device?: HIDDevice;
 
@@ -27,6 +30,8 @@ export class HIDDeviceView extends LitElement {
     // This function is called once after the first call to 'update'
     // This is the first time that the properties will be reflected properly
     firstUpdated() {
+        // No need to run this code if we are in test mode.
+        if(this.test) return;
         if(this.device==undefined) {
             // If a device wasn't set in the constructor, try and find a matching device from our attributes
             navigator.hid.getDevices().then((devices) => {
@@ -49,7 +54,6 @@ export class HIDDeviceView extends LitElement {
 
             for (let collection of device.collections) {
                 let collectionView = new HIDCollectionInfoView(collection);
-                collectionView.setAttribute('slot', 'collection');
                 this.appendChild(collectionView);
             }
 
@@ -58,7 +62,6 @@ export class HIDDeviceView extends LitElement {
             this.device.oninputreport = (e: HIDInputReportEvent) => this.processInputReport(e);
         }
     }
-   
 
     private processInputReport(report: HIDInputReportEvent) {
         let { device, reportId, data } = report;
@@ -77,10 +80,10 @@ export class HIDDeviceView extends LitElement {
     render() {
         return html `
         <h1>Device</h1>
-        <p>Product Name : ${this.productName?.toString()}
+        <p>Product Name : ${this.productName}
         Product Id: ${this.productId?.toString()}
         Vendor Id : ${this.vendorId?.toString()}
-        <slot name='collection'></slot>
+        <slot></slot>
         `;
     }
 }
