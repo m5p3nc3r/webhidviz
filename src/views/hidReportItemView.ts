@@ -25,7 +25,9 @@ export class HIDReportItemView extends HIDLitElement {
             for(let i=0; i<ctx.reportCount; i++) {
                 if(ctx.logicalMinimum!=undefined && ctx.logicalMaximum!=undefined) {
                     let usage = ctx.usages ? ctx.usages[i] : undefined;
-                    let usageView = new HIDUsageView(ctx.logicalMinimum, ctx.logicalMaximum, ctx.reportSize, usage);
+                    let lmin = ctx.logicalMinimum||0;
+                    let lmax = ctx.logicalMaximum?ctx.logicalMaximum : lmin + (ctx.reportSize ? 1<<(ctx.reportSize-1) : 0);
+                    let usageView = new HIDUsageView(lmin, lmax, ctx.reportSize, usage);
                     this.appendChild(usageView);
                 }
             }
