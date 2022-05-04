@@ -25,7 +25,7 @@ export class HIDReportItemView extends HIDLitElement {
             for(let i=0; i<ctx.reportCount; i++) {
                 if(ctx.logicalMinimum!=undefined && ctx.logicalMaximum!=undefined) {
                     let usage = ctx.usages ? ctx.usages[i] : undefined;
-                    let usageView = new HIDUsageView(ctx.logicalMinimum, ctx.logicalMaximum, usage);
+                    let usageView = new HIDUsageView(ctx.logicalMinimum, ctx.logicalMaximum, ctx.reportSize, usage);
                     this.appendChild(usageView);
                 }
             }
@@ -46,11 +46,11 @@ export class HIDReportItemView extends HIDLitElement {
 
     processStream(stream: BitInputStream) {
         if(this.type == HIDReportType.Input) {
-            for(let i=0; i<this.reportCount; i++ ) {
-                let value = stream.read(this.reportSize);
-                let node = this.childNodes[i] as HIDUsageView;
-                node.value = value;
-            }
+            this.childNodes.forEach((e:any) => {
+                if(e instanceof HIDLitElement) {
+                    e.processStream(stream);
+                }
+            });
         }
     }
 

@@ -1,15 +1,19 @@
 import { html, css, LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js'
+import { BitInputStream } from '../data/bitInputStream';
 import { HIDDecode } from '../data/hidDecode';
+import { HIDLitElement } from './hidlitelement';
 
 @customElement('hid-usage')
-export class HIDUsageView extends LitElement {
+export class HIDUsageView extends HIDLitElement {
     usage?: string;
 
     @property({type: Number})
     lMin: number;
     @property({type: Number})
     lMax: number;
+
+    reportSize: number;
 
     // This is the raw value from the input stream
     private _value : number = 0;
@@ -32,11 +36,12 @@ export class HIDUsageView extends LitElement {
     @property({type: Number})
     slider: number = 0;
 
-    constructor(lMin?: number, lMax?: number, usage?: number) {
+    constructor(lMin?: number, lMax?: number, reportSize?: number, usage?: number) {
         super();
         this.usage = usage?HIDDecode.fromPacked(usage)[1]:undefined;
         this.lMin = lMin || 0;
         this.lMax = lMax || 0;
+        this.reportSize = reportSize || 0;
     }
 
     normaliseValue(val: number) : number {
@@ -45,6 +50,10 @@ export class HIDUsageView extends LitElement {
         let range = this.lMax - this.lMin;
         let value = val - this.lMin;
         return (value / range);
+    }
+
+    processStream(stream: BitInputStream) {
+        this.value = stream.read(this.reportSize);
     }
 
     static styles = css`
