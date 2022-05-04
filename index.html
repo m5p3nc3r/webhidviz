@@ -7,7 +7,21 @@
     <title>Document</title>
 </head>
 <body>
-    <script type="module" src="output/multi-entry.js" defer></script>
     <button id="request-hid-device">Select device</button>
+    <button id="dump-report">Dump report</button>
+
+    <script type="module">
+        import { HIDSelector } from "./output/multi-entry.js";
+
+        document.getElementById('request-hid-device')?.addEventListener(
+            'click', HIDSelector.select
+        )
+
+        document.getElementById('dump-report')?.addEventListener(
+            'click', () => {
+                document.getElementsByTagName("hid-device")[0]?.dumpLastReport();
+            }
+        )
+    </script>
 </body>
 </html>

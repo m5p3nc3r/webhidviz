@@ -1,316 +1,3 @@
-var _a;
-class HIDSelector {
-}
-HIDSelector.select = async () => {
-    let device;
-    try {
-        let devices = await navigator.hid.requestDevice({ filters: [] });
-        device = devices[0];
-    }
-    catch (error) {
-        console.log("An error occurred.");
-    }
-    if (!device) {
-        console.log("No device was selected.");
-    }
-    else {
-        document.body.innerHTML += "<hid-device vendorid='" + device.vendorId + "' productid='" + device.productId + "'></hid-device>";
-        // Could also be added like this
-        //document.body.appendChild(new HIDDeviceView(device));
-    }
-    console.log('done');
-};
-(_a = document.getElementById('request-hid-device')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', HIDSelector.select);
-
-/**
- * This code is modified from https://github.com/nebkat/bit-buffer-ts/
- *
- * I only need a stream reader for now, so have removed the writing bits
- * Stream writing will be added if we add report generation
- */
-class BitView {
-    constructor(buffer, byteOffset = 0, byteLength = buffer.length - byteOffset) {
-        this.getBoolean = (offset) => this.getBit(offset) === 1;
-        this.getInt8 = (offset) => this.getBits(offset, 8, true);
-        this.getUint8 = (offset) => this.getBits(offset, 8, false);
-        this.getInt16 = (offset) => this.getBits(offset, 16, true);
-        this.getUint16 = (offset) => this.getBits(offset, 16, false);
-        this.getInt32 = (offset) => this.getBits(offset, 32, true);
-        this.getUint32 = (offset) => this.getBits(offset, 32, false);
-        this.buffer = (byteOffset === 0 && byteLength === buffer.length)
-            ? buffer : buffer.subarray(byteOffset, byteOffset + byteLength);
-        this.byteLength = byteLength;
-        this.bitLength = byteLength * 8;
-    }
-    checkBounds(offset, bits) {
-        const available = (this.bitLength - offset);
-        if (bits > available)
-            throw new Error('Cannot get/set ' + bits + ' bit(s) from offset ' + offset + ', ' + available + ' available');
-    }
-    /**
-     * Returns the bit value at the specified bit offset.
-     *
-     * @param offset Offset of bit.
-     */
-    getBit(offset) {
-        return (this.buffer[offset >> 3] >> ((offset & 0b111)) & 0b1);
-        //        return (this.buffer[offset >> 3] >> (7 - (offset & 0b111)) & 0b1) as (1 | 0);
-    }
-    /**
-     * Returns a `bits` long value at the specified bit offset.
-     *
-     * @param offset Offset of bits.
-     * @param bits Number of bits to read.
-     * @param signed Whether the result should be a signed or unsigned value.
-     */
-    getBits(offset, bits, signed) {
-        this.checkBounds(offset, bits);
-        let value = 0;
-        let written = 0;
-        for (let index = 0; index < bits; index++) {
-            let bit = this.getBit(offset + index);
-            value += bit << written;
-            written++;
-        }
-        if (signed) {
-            // Read imaginary MSB and convert to signed if needed
-            if (bits < 32 && value >> (bits - 1) > 0) {
-                value |= -1 ^ ((1 << bits) - 1);
-            }
-            else if (bits > 32 && value > 2 ** (bits - 1)) {
-                value -= 2 ** bits;
-            }
-        }
-        return value;
-    }
-    /**
-     * Returns a buffer containing the bytes at the specified bit offset.
-     *
-     * @param offset Offset of bytes.
-     * @param byteLength Number of bytes to read.
-     */
-    readBuffer(offset, byteLength) {
-        const buffer = new Uint8Array(byteLength);
-        for (let i = 0; i < byteLength; i++)
-            buffer[i] = this.getUint8(offset + (i * 8));
-        return buffer;
-    }
-}
-/**
- * Wrapper for {@link BitView}s that maintains an index while reading/writing sequential data.
- */
-class BitInputStream {
-    constructor(source, byteOffset, byteLength) {
-        this.readBoolean = () => this.readBit() === 1;
-        this.readInt8 = () => this.read(8, true);
-        this.readUint8 = () => this.read(8, false);
-        this.readInt16 = () => this.read(16, true);
-        this.readUint16 = () => this.read(16, false);
-        this.readInt32 = () => this.read(32, true);
-        this.readUint32 = () => this.read(32, false);
-        this.view = source instanceof BitView ? source : new BitView(source, byteOffset, byteLength);
-        this.buffer = this.view.buffer;
-        this.bitIndex = 0;
-        this.bitLength = this.view.bitLength;
-        this.byteLength = this.view.byteLength;
-    }
-    /** Alias for {@link bitIndex} */
-    get index() { return this.bitIndex; }
-    set index(val) { this.bitIndex = val; }
-    ;
-    /** Number of bits remaining in this stream's underlying buffer from the current position. */
-    get bitsLeft() { return this.bitLength - this.bitIndex; }
-    /** Current position of this stream (in bytes) from/to which data is read/written. */
-    get byteIndex() { return Math.ceil(this.bitIndex / 8); }
-    set byteIndex(val) { this.bitIndex = val * 8; }
-    readBit() {
-        const val = this.view.getBit(this.bitIndex);
-        this.bitIndex++;
-        return val;
-    }
-    read(bits, signed = false) {
-        const val = this.view.getBits(this.bitIndex, bits, signed);
-        this.bitIndex += bits;
-        return val;
-    }
-    readBuffer(byteLength) {
-        const buffer = this.view.readBuffer(this.bitIndex, byteLength);
-        this.bitIndex += byteLength * 8;
-        return buffer;
-    }
-}
-
-class HIDDecode {
-    static fromPacked(packed) {
-        let page = (packed >> 16) & 0xffff;
-        let id = packed & 0xffff;
-        return [this.usagePage(page), this.usage(page, id)];
-    }
-    static usagePage(usagePage) {
-        let ret = "";
-        switch (usagePage ? usagePage : 0) {
-            case 0x00:
-                ret = "undefined";
-                break;
-            case 0x01:
-                ret = "Generic Desktop Controls";
-                break;
-            case 0x02:
-                ret = "Simulation Controls";
-                break;
-            case 0x03:
-                ret = "VR Controls";
-                break;
-            case 0x04:
-                ret = "Sport Controls";
-                break;
-            case 0x05:
-                ret = "Game Controls";
-                break;
-            case 0x06:
-                ret = "Generic Device Controls";
-                break;
-            case 0x07:
-                ret = "Keyboard/Keypad";
-                break;
-            case 0x08:
-                ret = "LEDs";
-                break;
-            case 0x09:
-                ret = "Button";
-                break;
-            case 0x0a:
-                ret = "Ordinal";
-                break;
-            case 0x0b:
-                ret = "Telophony";
-                break;
-            case 0x0c:
-                ret = "Consumer";
-                break;
-            case 0x0d:
-                ret = "Digitizer";
-                break;
-            case 0x0e:
-                ret = "Reserved";
-                break;
-            case 0x0f:
-                ret = "PID Page";
-                break;
-            case 0x10:
-                ret = "Unicode";
-                break;
-            default: {
-                if (usagePage ? usagePage : 0 >= 0xff00)
-                    ret = "Vendor-defined";
-                else
-                    ret = "Reserved or not decoded...";
-                break;
-            }
-        }
-        return ret;
-    }
-    static usage(usagePage, usage) {
-        let ret = "";
-        switch (usagePage ? usagePage : 0) {
-            case 0x00:
-                ret = "Undefined";
-                break;
-            case 0x01:
-                ret = this.usage_genericDesktop(usage);
-                break;
-            default:
-                ret = "DEFAULT";
-                break;
-        }
-        return ret;
-    }
-    // https://www.usb.org/sites/default/files/documents/hut1_12v2.pdf page 26
-    static usage_genericDesktop(usage) {
-        let ret = "";
-        switch (usage ? usage : 0) {
-            case 0x00:
-                ret = "Undefined";
-                break;
-            case 0x01:
-                ret = "Pointer";
-                break;
-            case 0x02:
-                ret = "Mouse";
-                break;
-            case 0x04:
-                ret = "Joystick";
-                break;
-            case 0x05:
-                ret = "Game Pad";
-                break;
-            case 0x06:
-                ret = "Keyboard";
-                break;
-            case 0x07:
-                ret = "Keypad";
-                break;
-            case 0x08:
-                ret = "Multi-axis Controller";
-                break;
-            case 0x09:
-                ret = "Tablet PC System Controls";
-                break;
-            // 0x10 - 0x2F Reserved
-            case 0x30:
-                ret = "X";
-                break;
-            case 0x31:
-                ret = "Y";
-                break;
-            case 0x32:
-                ret = "Z";
-                break;
-            case 0x33:
-                ret = "Rx";
-                break;
-            case 0x34:
-                ret = "Ry";
-                break;
-            case 0x35:
-                ret = "Rz";
-                break;
-            case 0x36:
-                ret = "Slider";
-                break;
-            case 0x37:
-                ret = "Dial";
-                break;
-            case 0x38:
-                ret = "Wheel";
-                break;
-            case 0x39:
-                ret = "Hat switch";
-                break;
-            case 0x3A:
-                ret = "Counted Buffer";
-                break;
-            case 0x3B:
-                ret = "Byte Count";
-                break;
-            case 0x3C:
-                ret = "Motion Wakeup";
-                break;
-            case 0x3D:
-                ret = "Start";
-                break;
-            case 0x3E:
-                ret = "Select";
-                break;
-            // 0x3F Reserved
-            default:
-                ret = "Unparsed (TODO)";
-                break;
-        }
-        return ret;
-    }
-}
-
 /*! *****************************************************************************
 Copyright (c) Microsoft Corporation.
 
@@ -1193,6 +880,177 @@ function e(e) {
 var n;
 null != (null === (n = window.HTMLSlotElement) || void 0 === n ? void 0 : n.prototype.assignedElements) ? (o, n) => o.assignedElements(n) : (o, n) => o.assignedNodes(n).filter(o => o.nodeType === Node.ELEMENT_NODE);
 
+class HIDDecode {
+    static fromPacked(packed) {
+        let page = (packed >> 16) & 0xffff;
+        let id = packed & 0xffff;
+        return [this.usagePage(page), this.usage(page, id)];
+    }
+    static usagePage(usagePage) {
+        let ret = "";
+        switch (usagePage ? usagePage : 0) {
+            case 0x00:
+                ret = "undefined";
+                break;
+            case 0x01:
+                ret = "Generic Desktop Controls";
+                break;
+            case 0x02:
+                ret = "Simulation Controls";
+                break;
+            case 0x03:
+                ret = "VR Controls";
+                break;
+            case 0x04:
+                ret = "Sport Controls";
+                break;
+            case 0x05:
+                ret = "Game Controls";
+                break;
+            case 0x06:
+                ret = "Generic Device Controls";
+                break;
+            case 0x07:
+                ret = "Keyboard/Keypad";
+                break;
+            case 0x08:
+                ret = "LEDs";
+                break;
+            case 0x09:
+                ret = "Button";
+                break;
+            case 0x0a:
+                ret = "Ordinal";
+                break;
+            case 0x0b:
+                ret = "Telophony";
+                break;
+            case 0x0c:
+                ret = "Consumer";
+                break;
+            case 0x0d:
+                ret = "Digitizer";
+                break;
+            case 0x0e:
+                ret = "Reserved";
+                break;
+            case 0x0f:
+                ret = "PID Page";
+                break;
+            case 0x10:
+                ret = "Unicode";
+                break;
+            default: {
+                if (usagePage ? usagePage : 0 >= 0xff00)
+                    ret = "Vendor-defined";
+                else
+                    ret = "Reserved or not decoded...";
+                break;
+            }
+        }
+        return ret;
+    }
+    static usage(usagePage, usage) {
+        let ret = "";
+        switch (usagePage ? usagePage : 0) {
+            case 0x00:
+                ret = "Undefined";
+                break;
+            case 0x01:
+                ret = this.usage_genericDesktop(usage);
+                break;
+            default:
+                ret = "DEFAULT";
+                break;
+        }
+        return ret;
+    }
+    // https://www.usb.org/sites/default/files/documents/hut1_12v2.pdf page 26
+    static usage_genericDesktop(usage) {
+        let ret = "";
+        switch (usage ? usage : 0) {
+            case 0x00:
+                ret = "Undefined";
+                break;
+            case 0x01:
+                ret = "Pointer";
+                break;
+            case 0x02:
+                ret = "Mouse";
+                break;
+            case 0x04:
+                ret = "Joystick";
+                break;
+            case 0x05:
+                ret = "Game Pad";
+                break;
+            case 0x06:
+                ret = "Keyboard";
+                break;
+            case 0x07:
+                ret = "Keypad";
+                break;
+            case 0x08:
+                ret = "Multi-axis Controller";
+                break;
+            case 0x09:
+                ret = "Tablet PC System Controls";
+                break;
+            // 0x10 - 0x2F Reserved
+            case 0x30:
+                ret = "X";
+                break;
+            case 0x31:
+                ret = "Y";
+                break;
+            case 0x32:
+                ret = "Z";
+                break;
+            case 0x33:
+                ret = "Rx";
+                break;
+            case 0x34:
+                ret = "Ry";
+                break;
+            case 0x35:
+                ret = "Rz";
+                break;
+            case 0x36:
+                ret = "Slider";
+                break;
+            case 0x37:
+                ret = "Dial";
+                break;
+            case 0x38:
+                ret = "Wheel";
+                break;
+            case 0x39:
+                ret = "Hat switch";
+                break;
+            case 0x3A:
+                ret = "Counted Buffer";
+                break;
+            case 0x3B:
+                ret = "Byte Count";
+                break;
+            case 0x3C:
+                ret = "Motion Wakeup";
+                break;
+            case 0x3D:
+                ret = "Start";
+                break;
+            case 0x3E:
+                ret = "Select";
+                break;
+            // 0x3F Reserved
+            default:
+                ret = "Unparsed (TODO)";
+                break;
+        }
+        return ret;
+    }
+}
+
 class HIDLitElement extends s {
     constructor() {
         super();
@@ -1415,6 +1273,170 @@ HIDCollectionInfoView = __decorate([
     n$1('hid-collectioninfo')
 ], HIDCollectionInfoView);
 
+/**
+ * This code is modified from https://github.com/nebkat/bit-buffer-ts/
+ *
+ * I only need a stream reader for now, so have removed the writing bits
+ * Stream writing will be added if we add report generation
+ */
+class BitView {
+    constructor(buffer, byteOffset = 0, byteLength = buffer.length - byteOffset) {
+        this.getBoolean = (offset) => this.getBit(offset) === 1;
+        this.getInt8 = (offset) => this.getBits(offset, 8, true);
+        this.getUint8 = (offset) => this.getBits(offset, 8, false);
+        this.getInt16 = (offset) => this.getBits(offset, 16, true);
+        this.getUint16 = (offset) => this.getBits(offset, 16, false);
+        this.getInt32 = (offset) => this.getBits(offset, 32, true);
+        this.getUint32 = (offset) => this.getBits(offset, 32, false);
+        this.buffer = (byteOffset === 0 && byteLength === buffer.length)
+            ? buffer : buffer.subarray(byteOffset, byteOffset + byteLength);
+        this.byteLength = byteLength;
+        this.bitLength = byteLength * 8;
+    }
+    checkBounds(offset, bits) {
+        const available = (this.bitLength - offset);
+        if (bits > available)
+            throw new Error('Cannot get/set ' + bits + ' bit(s) from offset ' + offset + ', ' + available + ' available');
+    }
+    /**
+     * Returns the bit value at the specified bit offset.
+     *
+     * @param offset Offset of bit.
+     */
+    getBit(offset) {
+        return (this.buffer[offset >> 3] >> ((offset & 0b111)) & 0b1);
+        //        return (this.buffer[offset >> 3] >> (7 - (offset & 0b111)) & 0b1) as (1 | 0);
+    }
+    /**
+     * Returns a `bits` long value at the specified bit offset.
+     *
+     * @param offset Offset of bits.
+     * @param bits Number of bits to read.
+     * @param signed Whether the result should be a signed or unsigned value.
+     */
+    getBits(offset, bits, signed) {
+        this.checkBounds(offset, bits);
+        let value = 0;
+        let written = 0;
+        for (let index = 0; index < bits; index++) {
+            let bit = this.getBit(offset + index);
+            value += bit << written;
+            written++;
+        }
+        if (signed) {
+            // Read imaginary MSB and convert to signed if needed
+            if (bits < 32 && value >> (bits - 1) > 0) {
+                value |= -1 ^ ((1 << bits) - 1);
+            }
+            else if (bits > 32 && value > 2 ** (bits - 1)) {
+                value -= 2 ** bits;
+            }
+        }
+        return value;
+    }
+    /**
+     * Returns a buffer containing the bytes at the specified bit offset.
+     *
+     * @param offset Offset of bytes.
+     * @param byteLength Number of bytes to read.
+     */
+    readBuffer(offset, byteLength) {
+        const buffer = new Uint8Array(byteLength);
+        for (let i = 0; i < byteLength; i++)
+            buffer[i] = this.getUint8(offset + (i * 8));
+        return buffer;
+    }
+}
+/**
+ * Wrapper for {@link BitView}s that maintains an index while reading/writing sequential data.
+ */
+class BitInputStream {
+    constructor(source, byteOffset, byteLength) {
+        this.readBoolean = () => this.readBit() === 1;
+        this.readInt8 = () => this.read(8, true);
+        this.readUint8 = () => this.read(8, false);
+        this.readInt16 = () => this.read(16, true);
+        this.readUint16 = () => this.read(16, false);
+        this.readInt32 = () => this.read(32, true);
+        this.readUint32 = () => this.read(32, false);
+        this.view = source instanceof BitView ? source : new BitView(source, byteOffset, byteLength);
+        this.buffer = this.view.buffer;
+        this.bitIndex = 0;
+        this.bitLength = this.view.bitLength;
+        this.byteLength = this.view.byteLength;
+    }
+    /** Alias for {@link bitIndex} */
+    get index() { return this.bitIndex; }
+    set index(val) { this.bitIndex = val; }
+    ;
+    /** Number of bits remaining in this stream's underlying buffer from the current position. */
+    get bitsLeft() { return this.bitLength - this.bitIndex; }
+    /** Current position of this stream (in bytes) from/to which data is read/written. */
+    get byteIndex() { return Math.ceil(this.bitIndex / 8); }
+    set byteIndex(val) { this.bitIndex = val * 8; }
+    readBit() {
+        const val = this.view.getBit(this.bitIndex);
+        this.bitIndex++;
+        return val;
+    }
+    read(bits, signed = false) {
+        const val = this.view.getBits(this.bitIndex, bits, signed);
+        this.bitIndex += bits;
+        return val;
+    }
+    readBuffer(byteLength) {
+        const buffer = this.view.readBuffer(this.bitIndex, byteLength);
+        this.bitIndex += byteLength * 8;
+        return buffer;
+    }
+    static test() {
+        let assert = (v, t, desc) => {
+            if (v == t) {
+                console.log("OK    : " + desc + " => " + v + " == " + t);
+            }
+            if (v != t) {
+                console.log("ERROR : " + desc + " => " + v + " != " + t);
+            }
+        };
+        // Create a buffer
+        let b = new Uint8Array([32, 0, 0, 0, 64, 0, 0, 0]);
+        let s = new BitInputStream(b, 0, 8);
+        console.log("Result = " + s.readUint32());
+        console.log("Result = " + s.readUint32());
+        b = new Uint8Array([0b10101010]);
+        s = new BitInputStream(b, 0, 1);
+        for (let i = 0; i < 32; i++) {
+            console.log("Result = " + s.readBoolean());
+        }
+        b = new Uint8Array([0b10101010, 0b11010011]);
+        s = new BitInputStream(b, 0, 2);
+        console.log(" = " + s.read(4));
+        console.log("Result = " + s.readBoolean());
+        console.log("Result = " + s.readBoolean());
+        console.log("Result = " + s.readBoolean());
+        console.log("Result = " + s.readBoolean());
+        console.log(" = " + s.read(6));
+        console.log(" = " + s.read(2));
+        // HID report taken directly from a PS4 controller
+        b = new Uint8Array([
+            150, 68, 91, 198, 40, 0, 90, 0, 0, 106, 177, 14, 33, 0, 244, 255,
+            16, 0, 215, 248, 209, 31, 148, 255, 0, 0, 0, 0, 0, 27, 0, 0,
+            1, 120, 9, 108, 165, 11, 128, 0, 0, 0, 0, 128, 0, 0, 0, 128,
+            0, 0, 0, 0, 128, 0, 0, 0, 128, 0, 0, 0, 0, 128, 0
+        ]);
+        s = new BitInputStream(b, 0, b.length);
+        assert(s.readUint8(), 150, "Left x"); // Left x
+        assert(s.readUint8(), 68, "Left y");
+        assert(s.readUint8(), 91, "Right x");
+        assert(s.readUint8(), 198, "Right y");
+        assert(s.read(4), 8, "Hat switch");
+        assert(s.read(1), 0, "Button 1");
+        assert(s.read(1), 1, "Button 2");
+        assert(s.read(11), 0, "Buttons 3-13");
+        assert(s.read(1), 1, "Button 14");
+    }
+}
+
 let HIDDeviceView = class HIDDeviceView extends s {
     constructor(device) {
         super();
@@ -1458,7 +1480,8 @@ let HIDDeviceView = class HIDDeviceView extends s {
     }
     processInputReport(report) {
         let { device, reportId, data } = report;
-        let stream = new BitInputStream(new Uint8Array(data.buffer), 0, data.byteLength);
+        this.lastReport = new Uint8Array(data.buffer);
+        let stream = new BitInputStream(this.lastReport, 0, data.byteLength);
         // TODO: Make sure we pass this to the correct reportID
         // Iterate over the children that are of type HIDLitElelement
         this.childNodes.forEach((e) => {
@@ -1466,6 +1489,9 @@ let HIDDeviceView = class HIDDeviceView extends s {
                 e.processStream(stream);
             }
         });
+    }
+    dumpLastReport() {
+        console.log(this.lastReport || "");
     }
     render() {
         var _a, _b;
@@ -1494,5 +1520,22 @@ HIDDeviceView = __decorate([
     n$1('hid-device')
 ], HIDDeviceView);
 
-export { BitInputStream, BitView, HIDCollectionInfoView, HIDDecode, HIDDeviceView, HIDLitElement, HIDReportInfoView, HIDReportItemView, HIDReportType, HIDUsageView };
+class HIDSelector {
+    static select() {
+        try {
+            navigator.hid.requestDevice({ filters: [] }).then((devices) => {
+                let device = devices[0];
+                if (device) {
+                    document.body.appendChild(new HIDDeviceView(device));
+                    //                    document.body.innerHTML += "<hid-device vendorid='" + device.vendorId + "' productid='" + device.productId + "'></hid-device>";
+                }
+            });
+        }
+        catch (error) {
+            console.log("An error occurred.");
+        }
+    }
+}
+
+export { BitInputStream, BitView, HIDCollectionInfoView, HIDDecode, HIDDeviceView, HIDLitElement, HIDReportInfoView, HIDReportItemView, HIDReportType, HIDSelector, HIDUsageView };
 //# sourceMappingURL=multi-entry.js.map
