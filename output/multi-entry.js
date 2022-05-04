@@ -1057,8 +1057,8 @@ class HIDLitElement extends s {
     }
 }
 
-let HIDUsageView = class HIDUsageView extends s {
-    constructor(lMin, lMax, usage) {
+let HIDUsageView = class HIDUsageView extends HIDLitElement {
+    constructor(lMin, lMax, reportSize, usage) {
         super();
         // This is the raw value from the input stream
         this._value = 0;
@@ -1068,6 +1068,7 @@ let HIDUsageView = class HIDUsageView extends s {
         this.usage = usage ? HIDDecode.fromPacked(usage)[1] : undefined;
         this.lMin = lMin || 0;
         this.lMax = lMax || 0;
+        this.reportSize = reportSize || 0;
     }
     get value() {
         return this._value;
@@ -1088,6 +1089,9 @@ let HIDUsageView = class HIDUsageView extends s {
         let range = this.lMax - this.lMin;
         let value = val - this.lMin;
         return (value / range);
+    }
+    processStream(stream) {
+        this.value = stream.read(this.reportSize);
     }
     render() {
         return $ `
@@ -1132,7 +1136,7 @@ let HIDReportItemView = class HIDReportItemView extends HIDLitElement {
             for (let i = 0; i < ctx.reportCount; i++) {
                 if (ctx.logicalMinimum != undefined && ctx.logicalMaximum != undefined) {
                     let usage = ctx.usages ? ctx.usages[i] : undefined;
-                    let usageView = new HIDUsageView(ctx.logicalMinimum, ctx.logicalMaximum, usage);
+                    let usageView = new HIDUsageView(ctx.logicalMinimum, ctx.logicalMaximum, ctx.reportSize, usage);
                     this.appendChild(usageView);
                 }
             }
@@ -1159,11 +1163,11 @@ let HIDReportItemView = class HIDReportItemView extends HIDLitElement {
     }
     processStream(stream) {
         if (this.type == HIDReportType.Input) {
-            for (let i = 0; i < this.reportCount; i++) {
-                let value = stream.read(this.reportSize);
-                let node = this.childNodes[i];
-                node.value = value;
-            }
+            this.childNodes.forEach((e) => {
+                if (e instanceof HIDLitElement) {
+                    e.processStream(stream);
+                }
+            });
         }
     }
     render() {
