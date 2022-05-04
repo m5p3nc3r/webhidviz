@@ -8,6 +8,13 @@
 </head>
 <body>
     <script type="module" src="output/multi-entry.js" defer></script>
+
+    <script type="module">
+        // Run the BitInputStream tests
+        import { BitInputStream } from "./output/multi-entry.js";
+        BitInputStream.test();
+    </script>
+
     <hid-device test>
         <hid-collectioninfo product_name="Test Device" type="1" usagePage="1" usage="5">
             <hid-reportinfo slot="input" reportId="1">

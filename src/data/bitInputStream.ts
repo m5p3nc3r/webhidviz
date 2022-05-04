@@ -151,4 +151,60 @@ export class BitInputStream {
         this.bitIndex += byteLength * 8;
         return buffer;
     }
+
+    static test() {
+
+        let assert = (v: number, t: number, desc: string) => {
+            if(v==t) {
+                console.log("OK    : " + desc + " => " + v + " == " + t);
+            }
+            if(v!=t) {
+                console.log("ERROR : " + desc + " => " + v + " != " + t);
+            }
+        }
+        // Create a buffer
+        let b = new Uint8Array([32, 0, 0, 0, 64, 0, 0, 0]);
+        let s = new BitInputStream(b, 0, 8);
+        console.log("Result = " + s.readUint32());
+        console.log("Result = " + s.readUint32());
+
+        b = new Uint8Array([0b10101010]);
+        s = new BitInputStream(b, 0, 1);
+
+        for(let i=0; i<32; i++) {
+            console.log("Result = " + s.readBoolean())
+
+        }
+
+        b = new Uint8Array([0b10101010, 0b11010011]);
+        s = new BitInputStream(b, 0, 2);
+
+        console.log(" = " + s.read(4));
+        console.log("Result = " + s.readBoolean())
+        console.log("Result = " + s.readBoolean())
+        console.log("Result = " + s.readBoolean())
+        console.log("Result = " + s.readBoolean())
+        console.log(" = " + s.read(6)); 
+        console.log(" = " + s.read(2));
+
+
+        // HID report taken directly from a PS4 controller
+        b = new Uint8Array([
+            150, 68, 91, 198, 40, 0, 90, 0, 0, 106, 177, 14, 33, 0, 244, 255,
+            16, 0, 215, 248, 209, 31, 148, 255, 0, 0, 0, 0, 0, 27, 0, 0,
+            1, 120, 9, 108, 165, 11, 128, 0, 0, 0, 0, 128, 0, 0, 0, 128,
+            0, 0, 0, 0, 128, 0, 0, 0, 128, 0, 0, 0, 0, 128, 0
+        ]);
+        s = new BitInputStream(b, 0, b.length);
+        assert(s.readUint8(), 150, "Left x"); // Left x
+        assert(s.readUint8(), 68, "Left y");
+        assert(s.readUint8(), 91, "Right x");
+        assert(s.readUint8(), 198, "Right y");
+        assert(s.read(4), 8, "Hat switch");
+        assert(s.read(1), 0, "Button 1");
+        assert(s.read(1), 1, "Button 2");
+        assert(s.read(11), 0, "Buttons 3-13");
+        assert(s.read(1), 1, "Button 14");
+
+    }
 }

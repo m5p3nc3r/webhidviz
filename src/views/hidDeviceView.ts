@@ -63,9 +63,12 @@ export class HIDDeviceView extends LitElement {
         }
     }
 
+    private lastReport?: Uint8Array;
+
     private processInputReport(report: HIDInputReportEvent) {
         let { device, reportId, data } = report;
-        let stream = new BitInputStream(new Uint8Array(data.buffer),0, data.byteLength);
+        this.lastReport = new Uint8Array(data.buffer);
+        let stream = new BitInputStream(this.lastReport,0, data.byteLength);
 
         // TODO: Make sure we pass this to the correct reportID
 
@@ -75,6 +78,10 @@ export class HIDDeviceView extends LitElement {
                 e.processStream(stream);
             }
         });
+    }
+
+    public dumpLastReport() {
+        console.log(this.lastReport||"");
     }
 
     render() {

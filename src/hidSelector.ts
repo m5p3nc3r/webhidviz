@@ -1,25 +1,19 @@
-class HIDSelector {
-    public static select = async () => {
-        let device;
+import { HIDDeviceView } from "./views/hidDeviceView";
+
+export class HIDSelector {
+
+    public static select() {
         try {
-            let devices = await navigator.hid.requestDevice({filters:[]});
-    
-            device = devices[0];
+            navigator.hid.requestDevice({filters:[]}).then((devices) => {
+                let device = devices[0]
+                if(device) {
+                    document.body.appendChild(new HIDDeviceView(device));
+//                    document.body.innerHTML += "<hid-device vendorid='" + device.vendorId + "' productid='" + device.productId + "'></hid-device>";
+
+                }
+            })
         } catch (error) {
             console.log("An error occurred.");
         }
-    
-        if (!device) {
-            console.log("No device was selected.");
-        } else {
-            document.body.innerHTML += "<hid-device vendorid='" + device.vendorId + "' productid='" + device.productId + "'></hid-device>";
-            // Could also be added like this
-            //document.body.appendChild(new HIDDeviceView(device));
-        }  
-        console.log('done');      
     }
 }
-
-document.getElementById('request-hid-device')?.addEventListener(
-    'click', HIDSelector.select
-)
