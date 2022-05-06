@@ -16,6 +16,9 @@ export class HIDCollectionInfoView extends HIDLitElement {
     @property({type: Number})
     usage: number;
 
+    @property({type: String})
+    usageString: string = "";
+
 
     constructor(collection?: HIDCollectionInfo) {
         super();
@@ -25,11 +28,16 @@ export class HIDCollectionInfoView extends HIDLitElement {
         this.usagePage = collection?.usagePage||0;
         this.usage = collection?.usage||0;
 
+
         if(collection) {
             this.addReports("input", collection.inputReports);
             this.addReports("output", collection.outputReports);
             this.addReports("feature", collection.featureReports);
         }
+    }
+
+    firstUpdated() {
+        HIDDecode.usage(this.usagePage, this.usage).then(usage => this.usageString = usage);
     }
 
     addReports(slot: string, reports?: HIDReportInfo[]) {
@@ -55,7 +63,7 @@ export class HIDCollectionInfoView extends HIDLitElement {
         return html `
         <p>Type : ${this.type.toString()},
         Usage Page : ${HIDDecode.usagePage(this.usagePage)},
-        Usage : ${HIDDecode.usage(this.usagePage, this.usage)}
+        Usage : ${this.usageString}
         <slot name='input'></slot>
         <slot name='output'></slot>
         <slot name='feature'></slot>

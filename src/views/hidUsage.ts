@@ -38,7 +38,8 @@ export class HIDUsageView extends HIDLitElement {
 
     constructor(lMin?: number, lMax?: number, reportSize?: number, usage?: number) {
         super();
-        this.usage = usage?HIDDecode.fromPacked(usage)[1]:undefined;
+//        this.usage = usage?HIDDecode.fromPacked(usage)[1]:undefined;111
+        if(usage) HIDDecode.fromPacked(usage)[1].then( blah => console.log("---- " + blah));
         this.lMin = lMin || 0;
         this.lMax = lMax || 0;
         this.reportSize = reportSize || 0;
