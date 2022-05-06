@@ -74,6 +74,8 @@ export class HIDDecode {
             case 0x0B: ret = this.async_usage("telephony", usage); break;
             case 0x0C: ret = this.async_usage("consumer", usage); break;
             case 0x0D: ret = this.async_usage("digitizer", usage); break;
+            case 0x0E: ret = this.async_usage("haptics", usage); break;
+            case 0x0F: ret = this.async_usage("physicalInputdevice", usage); break;
             default: ret = new Promise((resolve) => resolve(`UsagePage ${usagePage} not supported`)); break;
         }
         return ret;

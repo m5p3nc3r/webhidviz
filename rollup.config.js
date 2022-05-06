@@ -34,6 +34,8 @@ const decoders = {
         'src/data/decode/telephony.ts',
         'src/data/decode/consumer.ts',
         'src/data/decode/digitizer.ts',
+        'src/data/decode/haptics.ts',
+        'src/data/decode/physicalInputDevice.ts',
     ],
     output: {
         dir: 'output/decode',
