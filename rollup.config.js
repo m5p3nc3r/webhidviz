@@ -36,6 +36,8 @@ const decoders = {
         'src/data/decode/digitizer.ts',
         'src/data/decode/haptics.ts',
         'src/data/decode/physicalInputDevice.ts',
+        'src/data/decode/unicode.ts',
+        'src/data/decode/eyeHeadTracker.ts',
     ],
     output: {
         dir: 'output/decode',
