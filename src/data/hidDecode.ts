@@ -70,6 +70,7 @@ export class HIDDecode {
             case 0x07: ret = this.usage_keyboardKeypad(usage); break;
             case 0x08: ret = this.usage_LED(usage); break;
             case 0x09: ret = this.usage_buttonPage(usage); break;
+            case 0x0A: ret = this.usage_ordinalPage(usage); break;
             default: ret = "Usage not supported"; break;
         }
         return ret;
@@ -776,4 +777,13 @@ export class HIDDecode {
         return ret;
     }
 
+    private static usage_ordinalPage(usage?: number) : string {
+        let ret="";
+        usage = usage || 0;
+        switch(usage) {
+            case 0x00: ret = "Reserved"; break;
+            default: ret = `Instance ${usage}`; break;
+        }
+        return ret;
+    }
 }
