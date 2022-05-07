@@ -40,6 +40,7 @@ const decoders = {
         'src/data/decode/eyeHeadTracker.ts',
         'src/data/decode/auxiliaryDisplay.ts',
         'src/data/decode/sensors.ts',
+        'src/data/decode/medicalInstrument.ts',
     ],
     output: {
         dir: 'output/decode',
