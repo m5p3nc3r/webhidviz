@@ -43,14 +43,18 @@ export class HIDDecode {
             case 0x83: ret = "Reserved"; break;
             case 0x84: ret = "Power Page"; break;// (0x84) 29
             case 0x85: ret = "Battery System Page"; break;// (0x85) 30
+            case 0x8C: ret = "Barcode Scanner Page"; break;// (0x8C) 31
+            case 0x8D: ret = "Scales Page"; break;// (0x8D) 32
+            case 0x8E: ret = "Magnetic Stripe Reader Page"; break;// (0x8E) 33
+            case 0x90: ret = "Camera Control Page"; break;// (0x90) 34
+            case 0x91: ret = "Arcade Page"; break;// (0x91) 35
+            case 0x92: ret = "Gaming Device Page"; break;// (0x92) 36
+            case 0xF1D0: ret = "FIDO Alliance Page"; break;// (0xF1D0) 37
 
+            // FF00-FFFF Vendor-defined
             default: {
-                if     (0x15 <= usagePage && usagePage <= 0x1F) ret = "Reserved"
-                else if(0x21 <= usagePage && usagePage <= 0x3F) ret = "Reserved"
-                else if(0x42 <= usagePage && usagePage <= 0x58) ret = "Reserved"
-                else if(0x5A <= usagePage && usagePage <= 0x7F) ret = "Reserved"
-                else if(usagePage >=0xff00) ret = "Vendor-defined";
-                else ret = "NOT DEFINED"; break;
+                if(usagePage >=0xff00) ret = "Vendor-defined";
+                else ret = "Reserved"; break;
             }
         }
         return ret;
@@ -87,6 +91,14 @@ export class HIDDecode {
             case 0x81: ret = this.async_usage("monitorEnumerated", usage); break;
             case 0x82: ret = this.async_usage("vesaVirtualControls", usage); break;
             case 0x84: ret = this.async_usage("power", usage); break;
+            case 0x85: ret = this.async_usage("batterySystem", usage); break;
+            case 0x8C: ret = this.async_usage("barcodeScanner", usage); break;
+            case 0x8D: ret = this.async_usage("scales", usage); break;
+            case 0x8E: ret = this.async_usage("magneticStripeReader", usage); break;
+            case 0x90: ret = this.async_usage("cameraControl", usage); break;
+            case 0x91: ret = this.async_usage("arcade", usage); break;
+            case 0x92: ret = this.async_usage("gamingDevice", usage); break;
+            case 0xF1D0: ret = this.async_usage("fidoAlliance", usage); break;
             default: ret = new Promise((resolve) => resolve(`UsagePage ${usagePage} not supported`)); break;
         }
         return ret;

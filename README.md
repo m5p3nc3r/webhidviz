@@ -85,5 +85,5 @@ npm run deploy
 ## TODO
 
 - [x] Publish to github pages 
-- [ ] Add full decode to hidDecode.ts
+- [x] Add full decode to hidDecode.ts
 - [ ] Improve visual presentation
