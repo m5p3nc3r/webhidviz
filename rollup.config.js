@@ -43,6 +43,10 @@ const decoders = {
         'src/data/decode/medicalInstrument.ts',
         'src/data/decode/brailleDisplay.ts',
         'src/data/decode/lightingAndIllumination.ts',
+        'src/data/decode/monitor.ts',
+        'src/data/decode/monitorEnumerated.ts',
+        'src/data/decode/vesaVirtualControls.ts',
+        'src/data/decode/power.ts',
     ],
     output: {
         dir: 'output/decode',
