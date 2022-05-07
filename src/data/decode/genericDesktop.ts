@@ -118,10 +118,8 @@ export function decode(usage: number) : string {
         case 0xE1: ret = "Call Mute Toggle"; break;// [73] OSC 4.16
         case 0xE2: ret = "Call Mute LED"; break;// [73] OOC 4.16
         
-        default: ret = "Reserved *** "; break;
+        default: ret = "Reserved"; break;
     }
-
-    console.log("Returning " + ret);
 
     return ret;
 }
