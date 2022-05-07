@@ -81,6 +81,8 @@ export class HIDDecode {
             case 0x14: ret = this.async_usage("auxiliaryDisplay", usage); break;
             case 0x20: ret = this.async_usage("sensors", usage); break;
             case 0x40: ret = this.async_usage("medicalInstrument", usage); break;
+            case 0x41: ret = this.async_usage("brailleDisplay", usage); break;
+            case 0x59: ret = this.async_usage("lightingAndIllumination", usage); break;
             default: ret = new Promise((resolve) => resolve(`UsagePage ${usagePage} not supported`)); break;
         }
         return ret;
