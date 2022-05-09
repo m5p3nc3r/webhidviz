@@ -1,0 +1,1 @@
+{"version":3,"file":"unicode.js","sources":["../../src/data/decode/unicode.ts"],"sourcesContent":["export function decode(usage: number) : string {\n    return `0x${usage.toString(16)}`;\n}\n"],"names":[],"mappings":"AAAM,SAAU,MAAM,CAAC,KAAa,EAAA;IAChC,OAAO,CAAA,EAAA,EAAK,KAAK,CAAC,QAAQ,CAAC,EAAE,CAAC,EAAE,CAAC;AACrC;;;;"}
