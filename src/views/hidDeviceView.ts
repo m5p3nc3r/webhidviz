@@ -57,9 +57,13 @@ export class HIDDeviceView extends LitElement {
                 this.appendChild(collectionView);
             }
 
-            device.open();
+            device.open().then(() => {
+                device.oninputreport = (e: HIDInputReportEvent) => this.processInputReport(e);
+            })
+            .catch(error => {
+                console.log("Error opening device " + error);
+            });
 
-            this.device.oninputreport = (e: HIDInputReportEvent) => this.processInputReport(e);
         }
     }
 
