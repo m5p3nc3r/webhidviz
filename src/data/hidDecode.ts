@@ -79,7 +79,7 @@ export class HIDDecode {
             case 0x0C: ret = this.async_usage("consumer", usage); break;
             case 0x0D: ret = this.async_usage("digitizer", usage); break;
             case 0x0E: ret = this.async_usage("haptics", usage); break;
-            case 0x0F: ret = this.async_usage("physicalInputdevice", usage); break;
+            case 0x0F: ret = this.async_usage("physicalInputDevice", usage); break;
             case 0x10: ret = this.async_usage("unicode", usage); break;
             case 0x12: ret = this.async_usage("eyeHeadTracker", usage); break;
             case 0x14: ret = this.async_usage("auxiliaryDisplay", usage); break;
