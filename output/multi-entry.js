@@ -1066,7 +1066,7 @@ class HIDDecode {
                 ret = this.async_usage("haptics", usage);
                 break;
             case 0x0F:
-                ret = this.async_usage("physicalInputdevice", usage);
+                ret = this.async_usage("physicalInputDevice", usage);
                 break;
             case 0x10:
                 ret = this.async_usage("unicode", usage);
