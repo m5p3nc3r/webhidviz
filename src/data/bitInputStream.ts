@@ -206,5 +206,11 @@ export class BitInputStream {
         assert(s.read(11), 0, "Buttons 3-13");
         assert(s.read(1), 1, "Button 14");
 
+
+        b = new Uint8Array([0, 127, 128]);
+        s = new BitInputStream(b, 0, b.length);
+        assert(s.readInt8(), 0, "Read int8 0");
+        assert(s.readInt8(), 127, "Read int8 127");
+        assert(s.readInt8(), -128, "Read int8 -128");
     }
 }

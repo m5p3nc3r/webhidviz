@@ -25,11 +25,13 @@ export class HIDUsageView extends HIDLitElement {
     }
     set value(v: number) {
         const oldValue = this._value;
-        if(this.lMin <= v && v<= this.lMax) {
-            this._value=v;
-            this.requestUpdate('value', oldValue);
-            this.slider = this.normaliseValue(v);
+        // Force the new value into the specified range
+        if(v < this.lMin || v > this.lMax) {
+            // TODO: Flag that the value is out of range
         }
+        this._value=v;
+        this.requestUpdate('value', oldValue);
+        this.slider = this.normaliseValue(v);
     }
 
     // The slider is a normailzed (0-1) verision of the raw input value
@@ -54,7 +56,7 @@ export class HIDUsageView extends HIDLitElement {
     }
 
     processStream(stream: BitInputStream) {
-        this.value = stream.read(this.reportSize);
+        this.value = stream.read(this.reportSize, this.lMin<0);
     }
 
     static styles = css`
